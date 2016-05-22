@@ -23,9 +23,7 @@ public class CarDownloaderService extends Service {
 	public int onStartCommand(Intent intent, int flags, int startId)  {
 		URL carPath;
 		
-		if (intent == null){
-			return Service.START_FLAG_REDELIVERY;
-		}
+		if (intent == null) return Service.START_FLAG_REDELIVERY;
 		
 		try {
 			carPath = new URL(intent.getDataString());

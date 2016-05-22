@@ -1,14 +1,17 @@
 package com.example.edwin.car2charge;
 
-import java.util.Locale;
+import android.app.ListActivity;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.location.Location;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Bundle;
-import android.app.ListActivity;
-import android.content.Context;
-import android.content.Intent;
-import android.database.Cursor;
+import android.support.annotation.NonNull;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -18,18 +21,27 @@ import android.widget.SimpleCursorAdapter;
 import android.widget.SimpleCursorAdapter.ViewBinder;
 import android.widget.TextView;
 import android.widget.Toast;
+import java.util.Locale;
 
-public class MainActivity extends ListActivity {
+public class MainActivity extends ListActivity implements GpsTrackerCallback {
+    private final static String TAG = "MainActivity";
+
     private static final String[] FROM = {CarDatabase.C_ADDRESS, CarDatabase.C_BATTERY, CarDatabase.C_DISTANCE, CarDatabase.C_DISTANCE_CP};
     private static final int[] TO = {R.id.text_address, R.id.text_load, R.id.text_distance, R.id.text_distance_cp};
-    private final static String TAG = "MainActivity";
     private Intent carDownloadIntent;
+    private GpsTracker gps;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         setTitle(R.string.app_name);
+
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) !=
+                PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) !=
+                        PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] {android.Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+        }
 
         if (!isNetworkConnected()){
             Toast.makeText(getApplicationContext(), "Sorry, no internet connection", Toast.LENGTH_LONG).show();
@@ -45,12 +57,18 @@ public class MainActivity extends ListActivity {
             adapter.setViewBinder(VIEW_BINDER);
             setListAdapter(adapter);
             carDownloadIntent = new Intent(getApplicationContext(), CarDownloaderService.class);
+            gps = new GpsTracker(this, this);
+            gps.getLocation();
+        }
+    }
 
-            if (savedInstanceState == null) {
-                carDownloadIntent.setData(Uri.parse(getURLincludingLocation()));
-                startService(carDownloadIntent);
-            } else {
-                Log.i(TAG, "savedInstance is not null");
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if (requestCode == 1) {
+            for (int i = 0; i < grantResults.length; i++) {
+                if (grantResults[i] != PackageManager.PERMISSION_GRANTED){
+                    return;
+                }
             }
         }
     }
@@ -107,8 +125,9 @@ public class MainActivity extends ListActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == refreshMenuId) {
-            item.getIntent().setData(Uri.parse(getURLincludingLocation()));
-            startService(item.getIntent());
+            //item.getIntent().setData(Uri.parse(getURLincludingLocation()));
+            //startService(item.getIntent());
+            gps.getLocation();
         }
         if (item.getItemId() == R.id.menu_settings) {
             startActivity(new Intent(this, PrefsActivity.class));
@@ -126,14 +145,8 @@ public class MainActivity extends ListActivity {
         double lat = 52.372789;
         double lng = 4.893669;
 
-        GPSTracker gps = new GPSTracker(this);
-        if (gps.canGetLocation()) {
-            lat = gps.getLatitude(); if (lat == 0) { lat = 52.372789; }
-            lng = gps.getLongitude(); if (lng == 0) { lng = 4.893669; }
-            //Toast.makeText(getApplicationContext(), "Your location is -\nLat: " + lat + "\nLong: " + lng, Toast.LENGTH_SHORT).show();
-        } else {
-            //Toast.makeText(getApplicationContext(), "Cannot get location, returning Damsquare", Toast.LENGTH_SHORT).show();
-        }
+        lat = gps.getLatitude(); if (lat == 0) { lat = 52.372789; }
+        lng = gps.getLongitude(); if (lng == 0) { lng = 4.893669; }
 
         url = String.format(Locale.getDefault(), WS_URL, server, 8081, lat, lng, perc);
         Log.d("GetURL", url);
@@ -159,7 +172,17 @@ public class MainActivity extends ListActivity {
         i.putExtra("battery", cursor.getString(4));
         startActivity(i);
         cursor.close();
+    }
 
-//		//super.onListItemClick(l, v, position, id);
+    @Override
+    public void LocationFound(Location location) {
+        Toast.makeText(this, "Location found", Toast.LENGTH_SHORT).show();
+        carDownloadIntent.setData(Uri.parse(getURLincludingLocation()));
+        startService(carDownloadIntent);
+    }
+
+    @Override
+    public void LocationNotAvailable() {
+        Toast.makeText(this, "Turn on your location services", Toast.LENGTH_LONG).show();
     }
 }

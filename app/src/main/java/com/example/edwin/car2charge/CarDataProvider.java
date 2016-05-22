@@ -15,7 +15,7 @@ import android.text.TextUtils;
 public class CarDataProvider extends ContentProvider {
 	
 	private CarDatabase carData;
-	public static final String AUTHORITY = "com.hype.car2charge.CarDataProvider"; 
+	public static final String AUTHORITY = "com.example.edwin.car2charge.CarDataProvider";
 	public static final int CARS = 100;
 	public static final int CAR_ID = 110;
 	
